@@ -1,10 +1,10 @@
-import { brand } from "@uni/shared";
 import { Link, router } from "expo-router";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { ApiError } from "../src/api.ts";
+import { AuthShell } from "../src/auth-shell.tsx";
 import { useAuth } from "../src/auth.tsx";
-import { Body, Button, Card, ErrorBox, Field, Screen, c, errorMessage } from "../src/ui.tsx";
+import { Button, ErrorBox, Field, c, errorMessage } from "../src/ui.tsx";
 
 export default function Login() {
   const { login } = useAuth();
@@ -30,44 +30,47 @@ export default function Login() {
   }
 
   return (
-    <Screen>
-      <View style={{ alignItems: "center", paddingVertical: 16, gap: 6 }}>
-        <View style={{ width: 64, height: 64, borderRadius: 16, backgroundColor: c.primary, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: "#fff", fontSize: 24, fontWeight: "700" }}>{brand.logo.monogram}</Text>
+    <AuthShell
+      title="Bem-vindo"
+      subtitle="Entre com o email e a palavra-passe da sua conta."
+      footer={
+        <View style={{ alignItems: "center", gap: 10 }}>
+          <Text style={{ color: c.textMuted, fontSize: 15 }}>
+            Ainda não tem conta?{" "}
+            <Link href="/register" style={{ color: c.primary, fontWeight: "700" }}>
+              Criar conta de estudante
+            </Link>
+          </Text>
+          <Text style={{ color: c.textMuted, fontSize: 13, textAlign: "center", lineHeight: 18 }}>
+            Motoristas e validadores entram com as credenciais fornecidas pela operadora.
+          </Text>
         </View>
-        <Text style={{ fontSize: 24, fontWeight: "700", color: c.text }}>{brand.name}</Text>
-        <Body muted>{brand.tagline}</Body>
-      </View>
-      <Card>
-        <Field
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          error={fields.email}
-        />
-        <Field
-          label="Palavra-passe"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoComplete="password"
-          error={fields.password}
-          onSubmitEditing={() => void submit()}
-        />
-        <ErrorBox message={error} />
-        <Button label="Entrar" onPress={() => void submit()} busy={busy} disabled={!email || !password} />
-      </Card>
-      <View style={{ alignItems: "center", gap: 12, paddingTop: 8 }}>
-        <Link href="/register" style={{ color: c.primary, fontSize: 16 }}>
-          Ainda não tem conta? Criar conta de estudante
-        </Link>
-        <Link href="/forgot" style={{ color: c.textMuted, fontSize: 15 }}>
-          Esqueci-me da palavra-passe
-        </Link>
-      </View>
-    </Screen>
+      }
+    >
+      <Field
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        autoComplete="email"
+        keyboardType="email-address"
+        placeholder="nome@exemplo.ao"
+        error={fields.email}
+      />
+      <Field
+        label="Palavra-passe"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        autoComplete="password"
+        error={fields.password}
+        onSubmitEditing={() => void submit()}
+      />
+      <Link href="/forgot" style={{ color: c.primary, fontSize: 14, fontWeight: "600", alignSelf: "flex-end" }}>
+        Esqueci-me da palavra-passe
+      </Link>
+      <ErrorBox message={error} />
+      <Button label="Entrar" onPress={() => void submit()} busy={busy} disabled={!email || !password} />
+    </AuthShell>
   );
 }

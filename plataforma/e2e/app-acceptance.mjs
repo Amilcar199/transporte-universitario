@@ -52,7 +52,7 @@ async function login(page, email, password) {
 
 /** Espera pelo primeiro de vários localizadores visíveis e devolve o seu índice. */
 async function firstVisible(locators, timeout = 15000) {
-  return Promise.any(locators.map((l, i) => l.first().waitFor({ state: "visible", timeout }).then(() => i)));
+  return Promise.any(locators.map((l, i) => l.filter({ visible: true }).first().waitFor({ state: "visible", timeout }).then(() => i)));
 }
 
 const browser = await chromium.launch({ channel: process.env.E2E_BROWSER_CHANNEL ?? "chrome", headless: process.env.E2E_HEADED !== "1" });

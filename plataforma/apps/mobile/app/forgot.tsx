@@ -1,7 +1,8 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import { api, ApiError } from "../src/api.ts";
-import { Body, Button, Card, ErrorBox, Field, Notice, Screen, Subtitle, errorMessage } from "../src/ui.tsx";
+import { AuthShell, BackToLogin } from "../src/auth-shell.tsx";
+import { Body, Button, ErrorBox, Field, Notice, Subtitle, errorMessage } from "../src/ui.tsx";
 
 export default function Forgot() {
   const [email, setEmail] = useState("");
@@ -45,36 +46,48 @@ export default function Forgot() {
 
   if (done) {
     return (
-      <Screen>
+      <AuthShell compact title="Palavra-passe alterada">
         <Notice tone="success">{done}</Notice>
         <Button label="Iniciar sessão" onPress={() => router.replace("/login")} />
-      </Screen>
+      </AuthShell>
     );
   }
 
   return (
-    <Screen>
-      <Card>
-        <Subtitle>1. Pedir código</Subtitle>
-        <Field label="Email da conta" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-        <Button label="Enviar código" onPress={() => void request()} busy={busy && !requested} disabled={!email} />
-        {requested ? <Notice>{requested.message}</Notice> : null}
-        {requested?.devCode ? (
-          <Notice tone="warning">
-            Ambiente de desenvolvimento: o envio por SMS/email ainda não está configurado. Código: {requested.devCode}
-          </Notice>
-        ) : null}
-      </Card>
+    <AuthShell
+      compact
+      title="Recuperar palavra-passe"
+      subtitle="Enviamos um código de 6 dígitos para confirmar que a conta é sua."
+      footer={<BackToLogin />}
+    >
+      <Subtitle>1. Pedir código</Subtitle>
+      <Field
+        label="Email da conta"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        placeholder="nome@exemplo.ao"
+      />
+      <Button label="Enviar código" onPress={() => void request()} busy={busy && !requested} disabled={!email} />
+      {requested ? <Notice>{requested.message}</Notice> : null}
+      {requested?.devCode ? (
+        <Notice tone="warning">
+          Ambiente de desenvolvimento: o envio por SMS/email ainda não está configurado. Código: {requested.devCode}
+        </Notice>
+      ) : null}
       {requested ? (
-        <Card>
+        <>
           <Subtitle>2. Definir nova palavra-passe</Subtitle>
           <Field label="Código de 6 dígitos" value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={6} error={fields.code} />
           <Field label="Nova palavra-passe" value={newPassword} onChangeText={setNewPassword} secureTextEntry error={fields.newPassword} />
           <Button label="Alterar palavra-passe" onPress={() => void reset()} busy={busy} disabled={code.length !== 6 || newPassword.length < 8} />
-          <Body muted>Ao alterar a palavra-passe, todas as sessões abertas são terminadas.</Body>
-        </Card>
+          <Body muted style={{ fontSize: 13, lineHeight: 18 }}>
+            Ao alterar a palavra-passe, todas as sessões abertas são terminadas.
+          </Body>
+        </>
       ) : null}
       <ErrorBox message={error} />
-    </Screen>
+    </AuthShell>
   );
 }

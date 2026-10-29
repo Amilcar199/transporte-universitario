@@ -136,11 +136,40 @@ export function Button({
   );
 }
 
-export function Field({ label, error, ...props }: TextInputProps & { label: string; error?: string }) {
+export function Field({ label, error, secureTextEntry, onFocus, onBlur, ...props }: TextInputProps & { label: string; error?: string }) {
+  const [focused, setFocused] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput aria-label={label} placeholderTextColor={c.textMuted} style={[styles.input, error ? { borderColor: c.danger } : null]} {...props} />
+      <View style={[styles.inputBox, focused && styles.inputFocused, error ? { borderColor: c.danger } : null]}>
+        <TextInput
+          aria-label={label}
+          placeholderTextColor={c.textMuted}
+          style={styles.input}
+          secureTextEntry={secureTextEntry && !revealed}
+          onFocus={(e) => {
+            setFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
+          {...props}
+        />
+        {secureTextEntry ? (
+          <Pressable
+            accessibilityRole="button"
+            aria-label={revealed ? "Ocultar palavra-passe" : "Mostrar palavra-passe"}
+            onPress={() => setRevealed((v) => !v)}
+            hitSlop={8}
+            style={styles.reveal}
+          >
+            <Text style={{ color: c.primary, fontSize: 14, fontWeight: "600" }}>{revealed ? "Ocultar" : "Mostrar"}</Text>
+          </Pressable>
+        ) : null}
+      </View>
       {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
   );
@@ -216,17 +245,36 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: c.background },
   screenContent: { padding: 16, gap: 12, paddingBottom: 40 },
-  card: { backgroundColor: c.surface, borderRadius: brand.radius.md, borderWidth: 1, borderColor: c.border, padding: 14, gap: 8 },
+  card: {
+    backgroundColor: c.surface,
+    borderRadius: brand.radius.lg,
+    borderWidth: 1,
+    borderColor: "#E6EAF1",
+    padding: 16,
+    gap: 8,
+    boxShadow: "0 2px 8px rgba(19, 43, 99, 0.06)",
+  },
   title: { fontSize: 22, fontWeight: "700", color: c.text },
   subtitle: { fontSize: 17, fontWeight: "600", color: c.text },
   body: { fontSize: 15, color: c.text, lineHeight: 21 },
   muted: { color: c.textMuted },
   row: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  button: { minHeight: 46, borderRadius: brand.radius.sm, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
-  buttonText: { fontSize: 16, fontWeight: "600" },
-  field: { gap: 4 },
-  label: { fontSize: 14, color: c.textMuted, fontWeight: "500" },
-  input: { minHeight: 46, borderWidth: 1, borderColor: c.border, borderRadius: brand.radius.sm, paddingHorizontal: 12, fontSize: 16, backgroundColor: c.surface, color: c.text },
+  button: { minHeight: 50, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
+  buttonText: { fontSize: 16, fontWeight: "700" },
+  field: { gap: 6 },
+  label: { fontSize: 14, color: c.text, fontWeight: "600" },
+  inputBox: {
+    minHeight: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: c.border,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFD",
+  },
+  inputFocused: { borderColor: c.primary, backgroundColor: c.surface },
+  input: { flex: 1, minHeight: 48, paddingHorizontal: 14, fontSize: 16, color: c.text, outlineWidth: 0 },
+  reveal: { paddingHorizontal: 14, minHeight: 48, justifyContent: "center" },
   fieldError: { color: c.danger, fontSize: 13 },
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: "flex-start" },
   badgeText: { fontSize: 12, fontWeight: "600" },
