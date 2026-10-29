@@ -1,0 +1,32 @@
+{
+  "name": "plataforma-mobilidade-universitaria",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Plataforma de transportes universitários em Angola: API, painel administrativo e app móvel.",
+  "workspaces": [
+    "packages/shared",
+    "apps/api",
+    "apps/admin"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev:api": "npm run dev -w @uni/api",
+    "dev:admin": "npm run dev -w @uni/admin",
+    "db:migrate": "npm run db:migrate -w @uni/api",
+    "db:seed:demo": "npm run db:seed:demo -w @uni/api",
+    "db:generate": "npm run db:generate -w @uni/api",
+    "test": "npm run test -w @uni/api",
+    "typecheck": "npm run typecheck -w @uni/shared && npm run typecheck -w @uni/api && npm run typecheck -w @uni/admin",
+    "build:admin": "npm run build -w @uni/admin",
+    "install:mobile": "npm --prefix apps/mobile install",
+    "dev:mobile": "npm --prefix apps/mobile run web",
+    "typecheck:mobile": "npm --prefix apps/mobile run typecheck",
+    "e2e:admin": "node e2e/admin-acceptance.mjs",
+    "e2e:app": "node e2e/app-acceptance.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}

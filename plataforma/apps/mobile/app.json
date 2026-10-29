@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "UniRota",
+    "slug": "unirota",
+    "scheme": "unirota",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "android": {
+      "package": "ao.unirota.app.provisorio",
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "ios": {
+      "bundleIdentifier": "ao.unirota.app.provisorio",
+      "supportsTablet": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "A câmara é usada pelo motorista para ler o passe digital dos estudantes."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "A localização é partilhada apenas enquanto conduz uma viagem iniciada, para que os estudantes acompanhem o autocarro."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

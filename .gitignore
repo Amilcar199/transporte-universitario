@@ -1,0 +1,6 @@
+# Ficheiros de referência locais: o pacote original de terceiros e o material extraído durante a auditoria
+# não são publicados (binários e conteúdo de outra empresa).
+*.xapk
+*.apk
+*.aab
+analise/
