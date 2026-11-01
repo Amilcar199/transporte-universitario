@@ -1,10 +1,10 @@
 import { LABELS } from "@uni/shared";
 import { router } from "expo-router";
 import { useState } from "react";
-import { api } from "../../../src/api.ts";
-import { addMinutesToTime, formatDate, luandaToday } from "../../../src/format.ts";
-import type { MyBooking } from "../../../src/types.ts";
-import { Badge, Body, Button, Card, Empty, ErrorBox, Loading, Row, Screen, Subtitle, errorMessage, useLoad, useRefreshOnFocus, type Tone } from "../../../src/ui.tsx";
+import { api } from "../../src/api.ts";
+import { addMinutesToTime, formatDate, luandaToday } from "../../src/format.ts";
+import type { MyBooking } from "../../src/types.ts";
+import { Badge, Body, Button, Card, Empty, ErrorBox, Loading, Row, Screen, Subtitle, errorMessage, useLoad, useRefreshOnFocus, type Tone } from "../../src/ui.tsx";
 
 const TONE: Record<string, Tone> = { confirmed: "success", boarded: "info", cancelled: "neutral", no_show: "danger" };
 

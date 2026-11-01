@@ -13,8 +13,8 @@ export default function ValidatorLayout() {
         contentStyle: { backgroundColor: brand.colors.background },
       }}
     >
-      <Stack.Screen name="index" options={{ title: "Viagens em curso" }} />
-      <Stack.Screen name="scan/[tripId]" options={{ title: "Validar passes" }} />
+      <Stack.Screen name="index" options={{ title: "Viagens em curso", headerShown: false }} />
+      <Stack.Screen name="scan/[tripId]" options={{ title: "Validar passes", headerShown: false }} />
     </Stack>
   );
 }

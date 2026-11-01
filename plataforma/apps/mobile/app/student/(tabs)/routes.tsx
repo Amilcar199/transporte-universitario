@@ -1,147 +1,134 @@
-import { LABELS, type RouteServiceType } from "@uni/shared";
-import * as Location from "expo-location";
-import { router } from "expo-router";
-import { useState } from "react";
-import { Pressable, View } from "react-native";
-import { api, ApiError } from "../../../src/api.ts";
+import { LABELS, type RouteDirection } from "@uni/shared";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { api } from "../../../src/api.ts";
 import { useAuth } from "../../../src/auth.tsx";
-import { formatDistance } from "../../../src/format.ts";
+import { addMinutesToTime, formatDays, relativeDay } from "../../../src/format.ts";
+import { Chips, Hero, HeroChip, HeroTitle, Icon, Page, Panel, Pill, seatsPill, TimeBar } from "../../../src/kit.tsx";
 import type { RouteSummary, University } from "../../../src/types.ts";
-import { Badge, Body, Button, Card, Chip, DemoTag, Empty, ErrorBox, Field, Loading, Row, Screen, Subtitle, useLoad } from "../../../src/ui.tsx";
-
-interface StopHit {
-  id: string;
-  name: string;
-  neighbourhood: string | null;
-  landmark: string | null;
-  kind: "pickup" | "destination";
-  isDemo: boolean;
-  distanceMeters?: number;
-}
+import { Body, c, DemoTag, Empty, ErrorBox, Loading, useLoad } from "../../../src/ui.tsx";
 
 export default function RoutesTab() {
   const { me } = useAuth();
+  const params = useLocalSearchParams<{ stopId?: string; stopName?: string }>();
   const verifiedUni = me?.student?.verificationStatus === "approved" ? me.student.universityId : null;
   const [universityId, setUniversityId] = useState<string | null>(verifiedUni);
-  const [serviceType, setServiceType] = useState<RouteServiceType>("university");
-  const [stop, setStop] = useState<StopHit | null>(null);
+  const [direction, setDirection] = useState<RouteDirection | null>(null);
   const [query, setQuery] = useState("");
-  const [stopHits, setStopHits] = useState<StopHit[] | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [stop, setStop] = useState<{ id: string; name: string } | null>(null);
+
+  useEffect(() => {
+    if (params.stopId) setStop({ id: params.stopId, name: params.stopName ?? "Paragem escolhida" });
+  }, [params.stopId, params.stopName]);
 
   const universities = useLoad(() => api<University[]>("/universities"));
   const routes = useLoad(() => {
-    const params = new URLSearchParams({ serviceType });
-    if (universityId && serviceType === "university") params.set("universityId", universityId);
-    if (stop) params.set("stopId", stop.id);
-    return api<RouteSummary[]>(`/routes?${params}`);
-  }, [serviceType, universityId, stop?.id]);
+    const q = new URLSearchParams({ serviceType: "university" });
+    if (universityId) q.set("universityId", universityId);
+    if (stop) q.set("stopId", stop.id);
+    return api<RouteSummary[]>(`/routes?${q}`);
+  }, [universityId, stop?.id]);
 
-  async function searchStops(nearMe: boolean) {
-    setSearching(true);
-    setSearchError(null);
-    try {
-      const params = new URLSearchParams();
-      if (query.trim()) params.set("q", query.trim());
-      if (universityId && serviceType === "university") params.set("universityId", universityId);
-      if (nearMe) {
-        const perm = await Location.requestForegroundPermissionsAsync();
-        if (perm.status !== "granted") {
-          setSearchError("Sem autorização de localização. Pode pesquisar a paragem pelo nome ou bairro.");
-          return;
-        }
-        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        params.set("lat", String(pos.coords.latitude));
-        params.set("lng", String(pos.coords.longitude));
-      }
-      const hits = await api<StopHit[]>(`/stops/search?${params}`);
-      setStopHits(hits.filter((h) => h.kind === "pickup"));
-    } catch (err) {
-      setSearchError(err instanceof ApiError ? err.message : "Não foi possível obter a localização.");
-    } finally {
-      setSearching(false);
-    }
-  }
+  const visible = useMemo(() => {
+    const text = query.trim().toLocaleLowerCase("pt");
+    return (routes.data ?? [])
+      .filter((r) => !direction || r.direction === direction)
+      .filter((r) => !text || `${r.name} ${r.code} ${r.description ?? ""} ${r.universities.join(" ")}`.toLocaleLowerCase("pt").includes(text))
+      .sort((a, b) => (a.departures[0] ?? "99").localeCompare(b.departures[0] ?? "99"));
+  }, [routes.data, direction, query]);
+
+  const hero = (
+    <Hero paddingBottom={24}>
+      <HeroTitle>Rotas universitárias</HeroTitle>
+      <View style={s.search}>
+        <Icon name="search" color={c.textMuted} />
+        <TextInput
+          aria-label="Pesquisar rotas"
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Bairro, rota ou universidade"
+          placeholderTextColor={c.textMuted}
+          style={s.searchInput}
+        />
+      </View>
+      <Chips>
+        {universities.data?.map((u) => (
+          <HeroChip key={u.id} label={u.shortName} selected={universityId === u.id} onPress={() => setUniversityId(universityId === u.id ? null : u.id)} />
+        ))}
+        <HeroChip label="Ida" selected={direction === "to_university"} onPress={() => setDirection(direction === "to_university" ? null : "to_university")} />
+        <HeroChip label="Volta" selected={direction === "from_university"} onPress={() => setDirection(direction === "from_university" ? null : "from_university")} />
+      </Chips>
+    </Hero>
+  );
 
   return (
-    <Screen onRefresh={() => void routes.reload()} refreshing={routes.loading}>
-      <Card>
-        <Subtitle>Tipo de serviço</Subtitle>
-        <Row>
-          <Chip label={LABELS.serviceType.university} selected={serviceType === "university"} onPress={() => setServiceType("university")} />
-          <Chip label={LABELS.serviceType.intercity} selected={serviceType === "intercity"} onPress={() => setServiceType("intercity")} />
-        </Row>
-        {serviceType === "intercity" ? (
-          <Body muted>As viagens intercidades exigem reserva e só estão disponíveis se o seu plano as incluir, com limite por período.</Body>
-        ) : (
-          <>
-            <Subtitle>Universidade</Subtitle>
-            <Row>
-              <Chip label="Todas" selected={!universityId} onPress={() => setUniversityId(null)} />
-              {universities.data?.map((u) => (
-                <Chip key={u.id} label={u.shortName} selected={universityId === u.id} onPress={() => setUniversityId(u.id)} />
-              ))}
-            </Row>
-          </>
-        )}
-      </Card>
-
-      <Card>
-        <Subtitle>Paragem</Subtitle>
-        {stop ? (
-          <Row>
-            <Body>{stop.name}</Body>
-            <Button label="Limpar" variant="secondary" onPress={() => setStop(null)} />
-          </Row>
-        ) : (
-          <>
-            <Field label="Nome, bairro ou referência" value={query} onChangeText={setQuery} placeholder="Ex.: Viana, Kilamba" onSubmitEditing={() => void searchStops(false)} />
-            <Row>
-              <View style={{ flex: 1 }}>
-                <Button label="Pesquisar" onPress={() => void searchStops(false)} busy={searching} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button label="Perto de mim" variant="secondary" onPress={() => void searchStops(true)} disabled={searching} />
-              </View>
-            </Row>
-            <ErrorBox message={searchError} />
-            {stopHits?.length === 0 ? <Empty>Nenhuma paragem encontrada em rotas activas.</Empty> : null}
-            {stopHits?.map((s) => (
-              <Pressable key={s.id} onPress={() => setStop(s)} style={{ paddingVertical: 8, borderTopWidth: 1, borderColor: "#eee" }}>
-                <Row>
-                  <Body>{s.name}</Body>
-                  <DemoTag show={s.isDemo} />
-                  {s.distanceMeters !== undefined ? <Badge label={formatDistance(s.distanceMeters)} tone="info" /> : null}
-                </Row>
-                {s.neighbourhood || s.landmark ? <Body muted>{[s.neighbourhood, s.landmark].filter(Boolean).join(" · ")}</Body> : null}
-              </Pressable>
-            ))}
-          </>
-        )}
-      </Card>
-
-      <Subtitle>Rotas disponíveis</Subtitle>
+    <Page hero={hero} onRefresh={() => void routes.reload()} refreshing={routes.loading}>
+      {stop ? (
+        <View style={s.stopFilter}>
+          <Icon name="pin" color={c.primary} size={18} />
+          <Text style={{ flex: 1, color: c.text, fontWeight: "600" }} numberOfLines={1}>
+            Passam em {stop.name}
+          </Text>
+          <Pressable accessibilityRole="button" onPress={() => setStop(null)} hitSlop={8}>
+            <Text style={{ color: c.primary, fontWeight: "700" }}>Limpar</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+        <Text style={{ fontSize: 17, fontWeight: "700", color: c.text }}>
+          {routes.data ? `${visible.length} ${visible.length === 1 ? "rota" : "rotas"} para si` : "Rotas"}
+        </Text>
+        <Text style={{ color: c.textMuted, fontSize: 14 }}>Ordenar: horário</Text>
+      </View>
       <ErrorBox message={routes.error} onRetry={() => void routes.reload()} />
       {routes.loading && !routes.data ? <Loading /> : null}
-      {routes.data?.length === 0 ? <Empty>Não há rotas activas para estes filtros.</Empty> : null}
-      {routes.data?.map((r) => (
-        <Pressable key={r.id} onPress={() => router.push(`/student/route/${r.id}`)}>
-          <Card>
-            <Row>
-              <Badge label={r.code} tone="info" />
-              {r.serviceType === "intercity" ? <Badge label={LABELS.serviceType.intercity} tone="warning" /> : null}
-              <DemoTag show={r.isDemo} />
-            </Row>
-            <Body>{r.name}</Body>
-            {r.serviceType === "university" ? (
-              <Body muted>
-                {LABELS.direction[r.direction]} · {r.universities.join(", ")}
-              </Body>
-            ) : null}
-          </Card>
-        </Pressable>
-      ))}
-    </Screen>
+      {routes.data && visible.length === 0 ? <Empty>Não há rotas activas para estes filtros.</Empty> : null}
+      {visible.map((r) => {
+        const seats = seatsPill(r.nextTrip?.seatsAvailable);
+        const first = r.departures[0];
+        return (
+          <Panel key={r.id} onPress={() => router.push(`/student/route/${r.id}`)} style={{ gap: 14 }}>
+            <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={s.name}>{r.name}</Text>
+                <Body muted>
+                  Rota {r.code} · {r.stopCount} paragens
+                </Body>
+              </View>
+              <Pill label={seats.label} tone={seats.tone} />
+            </View>
+            {first ? <TimeBar from={first} to={addMinutesToTime(first, r.durationMinutes)} /> : <Body muted>Sem horário activo.</Body>}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                <Body muted>
+                  {r.daysOfWeek.length ? formatDays(r.daysOfWeek) : "Sem dias"} · {r.direction === "to_university" ? "Ida" : "Volta"}
+                  {r.departures.length > 1 ? ` · ${r.departures.length} partidas` : ""}
+                </Body>
+                <DemoTag show={r.isDemo} />
+              </View>
+              {r.nextTrip ? (
+                <Text style={s.next}>
+                  {relativeDay(r.nextTrip.serviceDate)}, {r.nextTrip.departureTime}
+                </Text>
+              ) : null}
+            </View>
+          </Panel>
+        );
+      })}
+      {routes.data && visible.length > 0 ? (
+        <Body muted style={{ textAlign: "center", fontSize: 13 }}>
+          Lugares livres da próxima viagem marcada · {LABELS.serviceType.university}
+        </Body>
+      ) : null}
+    </Page>
   );
 }
+
+const s = StyleSheet.create({
+  search: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#fff", borderRadius: 18, paddingHorizontal: 18, minHeight: 58 },
+  searchInput: { flex: 1, fontSize: 16, color: c.text, minHeight: 56, outlineWidth: 0 },
+  stopFilter: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.primaryLight, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12 },
+  name: { fontSize: 18, fontWeight: "700", color: c.text },
+  next: { fontSize: 15, fontWeight: "800", color: c.text },
+});

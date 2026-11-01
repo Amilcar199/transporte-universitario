@@ -18,6 +18,44 @@ export function formatDate(date: string): string {
   return d.toLocaleDateString("pt-PT", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
 }
 
+/** Data por extenso curta, por exemplo «05 nov 2026». */
+export function formatLongDate(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  return d.toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+/** «Hoje», «Amanhã» ou a data curta. */
+export function relativeDay(date: string, today = luandaToday()): string {
+  if (date === today) return "Hoje";
+  if (date === addDays(today, 1)) return "Amanhã";
+  return formatDate(date);
+}
+
+export function luandaHour(now = new Date()): number {
+  return new Date(now.getTime() + LUANDA_OFFSET_MS).getUTCHours();
+}
+
+/** Hora actual em Luanda, no formato HH:MM. */
+export function luandaTime(now = new Date()): string {
+  return new Date(now.getTime() + LUANDA_OFFSET_MS).toISOString().slice(11, 16);
+}
+
+/** Fracção já decorrida de um período entre duas datas (0 a 1). */
+export function periodProgress(start: string, end: string, today: string): number {
+  const s = Date.parse(`${start}T00:00:00Z`);
+  const e = Date.parse(`${end}T00:00:00Z`);
+  const t = Date.parse(`${today}T00:00:00Z`);
+  if (e <= s) return 1;
+  return Math.max(0, Math.min(1, (t - s) / (e - s)));
+}
+
+export function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, "0")}`;
+}
+
 export function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString("pt-PT", { timeZone: brand.timeZone, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }

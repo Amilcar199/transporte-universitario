@@ -13,9 +13,9 @@ export default function DriverLayout() {
         contentStyle: { backgroundColor: brand.colors.background },
       }}
     >
-      <Stack.Screen name="index" options={{ title: "As minhas viagens" }} />
-      <Stack.Screen name="trip/[id]" options={{ title: "Viagem" }} />
-      <Stack.Screen name="scan/[tripId]" options={{ title: "Validar passes" }} />
+      <Stack.Screen name="index" options={{ title: "As minhas viagens", headerShown: false }} />
+      <Stack.Screen name="trip/[id]" options={{ title: "Viagem", headerShown: false }} />
+      <Stack.Screen name="scan/[tripId]" options={{ title: "Validar passes", headerShown: false }} />
       <Stack.Screen name="incident" options={{ title: "Comunicar ocorrência" }} />
     </Stack>
   );

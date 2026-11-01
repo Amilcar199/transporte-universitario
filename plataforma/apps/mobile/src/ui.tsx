@@ -104,7 +104,17 @@ export function Row({ children, style }: { children: ReactNode; style?: ViewStyl
   return <View style={[styles.row, style]}>{children}</View>;
 }
 
-type ButtonVariant = "primary" | "secondary" | "danger";
+type ButtonVariant = "primary" | "secondary" | "danger" | "accent" | "outline" | "dangerOutline" | "light";
+
+const BUTTON_COLORS: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
+  primary: { bg: c.primary, fg: "#fff", border: c.primary },
+  secondary: { bg: c.surface, fg: c.primary, border: c.primary },
+  danger: { bg: c.danger, fg: "#fff", border: c.danger },
+  accent: { bg: c.accent, fg: c.primaryDark, border: c.accent },
+  outline: { bg: c.surface, fg: c.text, border: "#D3D9E4" },
+  dangerOutline: { bg: c.surface, fg: c.danger, border: "#D3D9E4" },
+  light: { bg: "transparent", fg: "#fff", border: "rgba(255,255,255,0.6)" },
+};
 
 export function Button({
   label,
@@ -112,15 +122,19 @@ export function Button({
   variant = "primary",
   disabled,
   busy,
+  flex,
+  icon,
 }: {
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
   disabled?: boolean;
   busy?: boolean;
+  /** Ocupa o espaço disponível numa linha de botões. */
+  flex?: boolean;
+  icon?: ReactNode;
 }) {
-  const bg = variant === "primary" ? c.primary : variant === "danger" ? c.danger : c.surface;
-  const fg = variant === "secondary" ? c.primary : "#fff";
+  const { bg, fg, border } = BUTTON_COLORS[variant];
   return (
     <Pressable
       accessibilityRole="button"
@@ -128,10 +142,18 @@ export function Button({
       disabled={disabled || busy}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: bg, borderColor: variant === "secondary" ? c.primary : bg, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
+        flex ? { flex: 1 } : null,
+        { backgroundColor: bg, borderColor: border, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
       ]}
     >
-      {busy ? <ActivityIndicator color={fg} /> : <Text style={[styles.buttonText, { color: fg }]}>{label}</Text>}
+      {busy ? (
+        <ActivityIndicator color={fg} />
+      ) : (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {icon}
+          <Text style={[styles.buttonText, { color: fg }]}>{label}</Text>
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -247,19 +269,17 @@ export const styles = StyleSheet.create({
   screenContent: { padding: 16, gap: 12, paddingBottom: 40 },
   card: {
     backgroundColor: c.surface,
-    borderRadius: brand.radius.lg,
-    borderWidth: 1,
-    borderColor: "#E6EAF1",
-    padding: 16,
-    gap: 8,
-    boxShadow: "0 2px 8px rgba(19, 43, 99, 0.06)",
+    borderRadius: 22,
+    padding: 18,
+    gap: 10,
+    boxShadow: "0 6px 20px rgba(19, 43, 99, 0.08)",
   },
   title: { fontSize: 22, fontWeight: "700", color: c.text },
   subtitle: { fontSize: 17, fontWeight: "600", color: c.text },
   body: { fontSize: 15, color: c.text, lineHeight: 21 },
   muted: { color: c.textMuted },
   row: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  button: { minHeight: 50, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
+  button: { minHeight: 54, borderRadius: 14, borderWidth: 1.5, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
   buttonText: { fontSize: 16, fontWeight: "700" },
   field: { gap: 6 },
   label: { fontSize: 14, color: c.text, fontWeight: "600" },
@@ -276,8 +296,8 @@ export const styles = StyleSheet.create({
   input: { flex: 1, minHeight: 48, paddingHorizontal: 14, fontSize: 16, color: c.text, outlineWidth: 0 },
   reveal: { paddingHorizontal: 14, minHeight: 48, justifyContent: "center" },
   fieldError: { color: c.danger, fontSize: 13 },
-  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: "flex-start" },
-  badgeText: { fontSize: 12, fontWeight: "600" },
-  notice: { borderLeftWidth: 4, borderRadius: brand.radius.sm, padding: 12 },
+  badge: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, alignSelf: "flex-start" },
+  badgeText: { fontSize: 13, fontWeight: "700" },
+  notice: { borderLeftWidth: 4, borderRadius: 14, padding: 14 },
   chip: { borderWidth: 1, borderColor: c.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: c.surface },
 });

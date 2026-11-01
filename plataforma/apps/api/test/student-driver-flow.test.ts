@@ -69,6 +69,13 @@ describe("catálogo do estudante", () => {
   it("lista rotas, paragens e viagens com lugares disponíveis", async () => {
     const routes = await t.call<any>("GET", `/routes?universityId=${net.uni.id}`);
     expect(routes.body.map((r: any) => r.id)).toContain(net.route.id);
+    expect(routes.body.find((r: any) => r.id === net.route.id)).toMatchObject({
+      stopCount: 2,
+      durationMinutes: 30,
+      departures: ["18:00"],
+      daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
+      nextTrip: { serviceDate: t.today(), departureTime: "18:00", seatsAvailable: 2 },
+    });
     const stopsNear = await t.call<any>("GET", `/stops/search?universityId=${net.uni.id}&lat=-8.9&lng=13.3`);
     expect(stopsNear.body[0].id).toBe(net.pickup.id);
     expect(stopsNear.body[0].distanceMeters).toBe(0);
@@ -211,6 +218,11 @@ describe("reservas e operação do motorista", () => {
     expect(live.status).toBe(200);
     expect(live.body.location).toMatchObject({ lat: -8.905, lng: 13.31 });
     expect(live.body.myStop.plannedTime).toBe("18:00");
+    expect(live.body.myStopId).toBe(net.pickup.id);
+    expect(live.body.vehicle).toEqual({ plate: net.vehicle.plate, model: "Autocarro de testes" });
+    expect(live.body.route.stops.map((s: any) => s.stopId)).toEqual([net.pickup.id, net.campus.id]);
+    const myBookings = await t.call<any>("GET", "/bookings/me", tokenA);
+    expect(myBookings.body[0]).toMatchObject({ vehiclePlate: net.vehicle.plate, endStop: { name: "Campus Teste", minutesFromStart: 30 } });
     const outsider = await t.login("nao.subscrito@teste.ao");
     expect((await t.call("GET", `/trips/${net.trip.id}/live`, outsider)).status).toBe(403);
 

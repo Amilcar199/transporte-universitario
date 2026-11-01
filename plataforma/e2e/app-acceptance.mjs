@@ -79,14 +79,18 @@ try {
     await student.goto(`${APP_URL}/student/plans`);
     const active = student.getByText("Activa", { exact: true });
     const choose = button(student, "Escolher este plano");
-    const pay = button(student, "Pagamento de teste (sem dinheiro real)");
+    const pay = student.getByRole("button", { name: /Pagamento de teste \(sem dinheiro real\)/ });
     const simulate = button(student, "Simular pagamento aceite");
     let actions = [];
     for (let i = 0; i < 4; i++) {
       const state = await firstVisible([active, simulate, pay, choose]);
       if (state === 0) break;
       if (state === 1) { await simulate.click(); actions.push("pagamento de teste aceite"); }
-      if (state === 2) { await pay.click(); actions.push("pagamento de teste iniciado"); }
+      if (state === 2) {
+        await pay.first().click();
+        await student.getByRole("button", { name: /^Pagar / }).click();
+        actions.push("pagamento de teste iniciado");
+      }
       if (state === 3) { await choose.first().click(); actions.push("plano escolhido"); }
       await student.waitForTimeout(500);
     }
@@ -102,7 +106,7 @@ try {
     requiresBooking = pass.subscription?.requiresBooking ?? null;
     passToken = (await (await tokenResponse).json()).token;
     await student.locator("svg").first().waitFor();
-    await student.getByText(/Novo código em \d+ s/).waitFor();
+    await student.getByText(/Actualiza em \d\d:\d\d/).waitFor();
     if (passToken.split(".").length !== 3) throw new Error("O código do passe não tem o formato esperado.");
     const payload = JSON.parse(Buffer.from(passToken.split(".")[1], "base64url").toString());
     const allowed = new Set(["pid", "jti", "aud", "iat", "exp", "iss", "sub"]);
@@ -113,22 +117,26 @@ try {
 
   await step(`Reservar lugar na ${ROUTE_CODE} para amanhã e impedir reserva duplicada`, async () => {
     await student.goto(`${APP_URL}/student/routes`);
-    await student.getByText(ROUTE_CODE, { exact: true }).first().click();
-    await student.getByText("Reservar lugar").waitFor();
-    await button(student, "Hoje").locator("xpath=following-sibling::*[1]").click();
+    await student.getByText(new RegExp(`^Rota ${ROUTE_CODE} · `)).first().click();
     const trip = student.getByText(/^Partida às \d\d:\d\d$/).first();
-    await trip.waitFor();
+    async function chooseTomorrowTrip() {
+      await student.getByText("Reservar lugar").waitFor();
+      await button(student, "Hoje").locator("xpath=following-sibling::*[1]").click();
+      await trip.waitFor();
+      await trip.click();
+      await student.getByText("Paragens da rota", { exact: true }).locator("xpath=..").getByRole("button").first().click();
+      await button(student, "Confirmar reserva").click();
+    }
+    await chooseTomorrowTrip();
     const departure = await trip.innerText();
-    await trip.click();
-    await student.getByText("3. Paragem de embarque").locator("xpath=following-sibling::*[1]").getByRole("button").first().click();
-    await button(student, "Confirmar reserva").click();
     const success = student.getByText(/Reserva confirmada\. Lugar \d+\./);
     const duplicate = student.getByText("Já tem uma reserva confirmada nesta viagem.");
     const first = await firstVisible([success, duplicate]);
     const firstText = first === 0 ? await success.innerText() : "já existia reserva desta estudante nesta viagem";
     if (first === 0) {
-      await trip.click();
-      await button(student, "Confirmar reserva").click();
+      // Depois de reservar, o ecrã bloqueia a mesma viagem; recarregar repõe o formulário para testar o servidor.
+      await student.reload();
+      await chooseTomorrowTrip();
       await duplicate.waitFor();
     }
     return { text: `${departure}: ${firstText}; segunda tentativa recusada pelo servidor` };
@@ -147,16 +155,17 @@ try {
     await step("Motorista inicia sessão e vê as viagens atribuídas", async () => {
       await login(driver, E2E_DRIVER_EMAIL, E2E_DRIVER_PASSWORD);
       await driver.waitForURL(/\/driver/);
-      await driver.getByText("Hoje", { exact: true }).waitFor();
+      await driver.getByText(/^Rota |^Não tem viagens atribuídas/).first().waitFor();
     });
 
     await step(`Motorista inicia a viagem de hoje na ${ROUTE_CODE} e partilha a localização`, async () => {
-      const row = driver.getByText(new RegExp(`^\\d\\d:\\d\\d · ${ROUTE_CODE}$`)).first();
-      if (!(await row.isVisible())) return { skipped: true, text: "sem viagem desta rota hoje para este motorista" };
+      const todaySection = driver.getByText("Hoje", { exact: true });
+      const row = todaySection.locator("xpath=../..").getByText(`Rota ${ROUTE_CODE}`, { exact: true }).first();
+      if (!(await todaySection.isVisible()) || !(await row.isVisible())) return { skipped: true, text: "sem viagem desta rota hoje para este motorista" };
       await row.click();
       tripOpened = true;
       const start = button(driver, "Iniciar viagem");
-      const validate = button(driver, "Validar passes (câmara)");
+      const validate = button(driver, "Validar passe");
       const state = await firstVisible([start, validate, driver.getByText("Concluída", { exact: true })]);
       if (state === 2) return { skipped: true, text: "a viagem de hoje já estava concluída" };
       const locations = driver.waitForResponse((r) => /\/driver\/trips\/[^/]+\/locations$/.test(r.url()), { timeout: 30000 });
@@ -167,19 +176,21 @@ try {
       return { text: `localização aceite pelo servidor: ${JSON.stringify(await res.json())}` };
     });
 
-    if (tripOpened && (await button(driver, "Validar passes (câmara)").isVisible())) {
+    if (tripOpened && (await button(driver, "Validar passe").isVisible())) {
       await step("Motorista valida o passe da estudante (código introduzido manualmente)", async () => {
-        await button(driver, "Validar passes (câmara)").click();
+        await button(driver, "Validar passe").click();
+        await button(driver, "Introduzir o código manualmente").click();
         await driver.getByLabel("Código do passe").fill(passToken);
         await button(driver, "Validar").click();
         const expected = requiresBooking ? "Reserva necessária" : "Viagem autorizada";
         await driver.getByText(expected, { exact: true }).waitFor();
         let replay = "";
         if (!requiresBooking) {
-          await button(driver, "Ler o próximo passe").click();
+          await button(driver, "Ler outro").click();
+          await button(driver, "Introduzir o código manualmente").click();
           await driver.getByLabel("Código do passe").fill(passToken);
           await button(driver, "Validar").click();
-          await button(driver, "Ler o próximo passe").waitFor();
+          await button(driver, "Ler outro").waitFor();
           if (await driver.getByText("Viagem autorizada", { exact: true }).isVisible()) throw new Error("O mesmo código foi aceite duas vezes.");
           replay = "; reutilização do mesmo código recusada";
         }

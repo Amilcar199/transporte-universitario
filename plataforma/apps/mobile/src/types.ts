@@ -51,6 +51,12 @@ export interface RouteSummary {
   serviceType: RouteServiceType;
   isDemo: boolean;
   universities: string[];
+  stopCount: number;
+  /** Minutos do início ao fim do percurso, segundo o horário. */
+  durationMinutes: number;
+  departures: string[];
+  daysOfWeek: number[];
+  nextTrip: { serviceDate: string; departureTime: string; capacity: number; seatsAvailable: number } | null;
 }
 
 export interface RouteStop {
@@ -111,6 +117,16 @@ export interface MyBooking {
   direction: RouteDirection;
   stopName: string;
   minutesFromStart: number | null;
+  vehiclePlate: string | null;
+  endStop: { name: string; minutesFromStart: number } | null;
+}
+
+export interface LiveStop {
+  stopId: string;
+  name: string;
+  lat: number;
+  lng: number;
+  minutesFromStart: number;
 }
 
 export interface LiveTrip {
@@ -119,6 +135,9 @@ export interface LiveTrip {
   serviceDate: string;
   departureTime: string;
   startedAt: string | null;
+  route: { code: string; name: string; stops: LiveStop[] };
+  vehicle: { plate: string; model: string | null } | null;
+  myStopId: string | null;
   location: { lat: number; lng: number; speedMps: number | null; heading: number | null; recordedAt: string } | null;
   myStop: { name: string; plannedTime: string | null; distanceMeters: number | null } | null;
   note: string;

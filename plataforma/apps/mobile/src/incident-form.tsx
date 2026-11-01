@@ -6,10 +6,18 @@ import type { Incident } from "./types.ts";
 import { Badge, Body, Button, Card, Chip, ErrorBox, Field, Notice, Row, Screen, Subtitle, errorMessage, useLoad } from "./ui.tsx";
 
 /** Usado por estudantes e motoristas: o servidor só aceita viagens em que a pessoa participa. */
-export function IncidentForm({ trips }: { trips: { id: string; label: string }[] }) {
+export function IncidentForm({
+  trips,
+  initialKind = "delay",
+  initialTripId = null,
+}: {
+  trips: { id: string; label: string }[];
+  initialKind?: IncidentKind;
+  initialTripId?: string | null;
+}) {
   const mine = useLoad(() => api<Incident[]>("/incidents/me"));
-  const [kind, setKind] = useState<IncidentKind>("delay");
-  const [tripId, setTripId] = useState<string | null>(null);
+  const [kind, setKind] = useState<IncidentKind>(initialKind);
+  const [tripId, setTripId] = useState<string | null>(initialTripId);
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { hasPermission, ROUTE_SERVICE_TYPES } from "@uni/shared";
@@ -9,11 +9,13 @@ import {
   routes,
   routeStops,
   routeUniversities,
+  schedules,
   stops,
   studentProfiles,
   studentVerifications,
   trips,
   universities,
+  vehicles,
 } from "../db/schema.ts";
 import { badRequest, conflict, forbidden, notFound, parse } from "../errors.ts";
 import { addDays, dateSchema, distanceMeters, ilikeAny, localDate, localTime, minutesOf, qualified, timePlusMinutes, uuidParam } from "../lib.ts";
@@ -37,6 +39,9 @@ function minutesUntil(now: Date, serviceDate: string, departureTime: string): nu
   const dayDiff = Math.round((Date.parse(`${serviceDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
   return dayDiff * 24 * 60 + minutesOf(departureTime) - minutesOf(localTime(now));
 }
+
+/** Até onde se procura a próxima viagem marcada de cada rota na listagem. */
+const NEXT_TRIP_HORIZON_DAYS = 14;
 
 const seatsTaken = sql<number>`(select count(*)::int from ${bookings} where ${qualified(bookings.tripId)} = ${qualified(trips.id)} and ${qualified(bookings.status)} in ('confirmed', 'boarded'))`;
 
@@ -124,12 +129,59 @@ export async function studentRoutes(app: FastifyInstance) {
       )
       .orderBy(asc(routes.code));
     if (rows.length === 0) return [];
-    const unis = await db
-      .select({ routeId: routeUniversities.routeId, shortName: universities.shortName })
-      .from(routeUniversities)
-      .innerJoin(universities, eq(universities.id, routeUniversities.universityId))
-      .where(inArray(routeUniversities.routeId, rows.map((r) => r.id)));
-    return rows.map((r) => ({ ...r, universities: unis.filter((u) => u.routeId === r.id).map((u) => u.shortName) }));
+    const ids = rows.map((r) => r.id);
+    const now = app.ctx.now();
+    const today = localDate(now);
+    const [unis, stopStats, scheduleRows, upcoming] = await Promise.all([
+      db
+        .select({ routeId: routeUniversities.routeId, shortName: universities.shortName })
+        .from(routeUniversities)
+        .innerJoin(universities, eq(universities.id, routeUniversities.universityId))
+        .where(inArray(routeUniversities.routeId, ids)),
+      db
+        .select({
+          routeId: routeStops.routeId,
+          stopCount: sql<number>`count(*)::int`,
+          durationMinutes: sql<number>`max(${routeStops.minutesFromStart})::int`,
+        })
+        .from(routeStops)
+        .innerJoin(stops, eq(stops.id, routeStops.stopId))
+        .where(and(inArray(routeStops.routeId, ids), eq(stops.active, true)))
+        .groupBy(routeStops.routeId),
+      db
+        .select({ routeId: schedules.routeId, departureTime: schedules.departureTime, daysOfWeek: schedules.daysOfWeek })
+        .from(schedules)
+        .where(and(inArray(schedules.routeId, ids), eq(schedules.active, true)))
+        .orderBy(asc(schedules.departureTime)),
+      db
+        .select({ routeId: trips.routeId, serviceDate: trips.serviceDate, departureTime: trips.departureTime, capacity: trips.capacity, taken: seatsTaken })
+        .from(trips)
+        .where(
+          and(
+            inArray(trips.routeId, ids),
+            eq(trips.status, "scheduled"),
+            lte(trips.serviceDate, addDays(today, NEXT_TRIP_HORIZON_DAYS)),
+            sql`(${trips.serviceDate} > ${today} or (${trips.serviceDate} = ${today} and ${trips.departureTime} > ${localTime(now)}))`,
+          ),
+        )
+        .orderBy(asc(trips.serviceDate), asc(trips.departureTime)),
+    ]);
+    return rows.map((r) => {
+      const stats = stopStats.find((s) => s.routeId === r.id);
+      const own = scheduleRows.filter((s) => s.routeId === r.id);
+      const next = upcoming.find((t) => t.routeId === r.id);
+      return {
+        ...r,
+        universities: unis.filter((u) => u.routeId === r.id).map((u) => u.shortName),
+        stopCount: stats?.stopCount ?? 0,
+        durationMinutes: stats?.durationMinutes ?? 0,
+        departures: [...new Set(own.map((s) => s.departureTime))],
+        daysOfWeek: [...new Set(own.flatMap((s) => s.daysOfWeek))].sort((a, b) => a - b),
+        nextTrip: next
+          ? { serviceDate: next.serviceDate, departureTime: next.departureTime, capacity: next.capacity, seatsAvailable: Math.max(0, next.capacity - next.taken) }
+          : null,
+      };
+    });
   });
 
   app.get("/routes/:id", async (request) => {
@@ -200,7 +252,7 @@ export async function studentRoutes(app: FastifyInstance) {
   // ------------------------------------------------------------ Reservas
   app.get("/bookings/me", { preHandler: can("student.self") }, async (request) => {
     const since = addDays(localDate(app.ctx.now()), -14);
-    return db
+    const rows = await db
       .select({
         id: bookings.id,
         status: bookings.status,
@@ -210,20 +262,35 @@ export async function studentRoutes(app: FastifyInstance) {
         serviceDate: trips.serviceDate,
         departureTime: trips.departureTime,
         tripStatus: trips.status,
+        routeId: routes.id,
         routeCode: routes.code,
         routeName: routes.name,
         direction: routes.direction,
         stopName: stops.name,
         minutesFromStart: routeStops.minutesFromStart,
+        vehiclePlate: vehicles.plate,
       })
       .from(bookings)
       .innerJoin(trips, eq(trips.id, bookings.tripId))
       .innerJoin(routes, eq(routes.id, trips.routeId))
       .innerJoin(stops, eq(stops.id, bookings.stopId))
       .leftJoin(routeStops, and(eq(routeStops.routeId, trips.routeId), eq(routeStops.stopId, bookings.stopId)))
+      .leftJoin(vehicles, eq(vehicles.id, trips.vehicleId))
       .where(and(eq(bookings.studentId, request.auth!.userId), gte(trips.serviceDate, since)))
       .orderBy(desc(trips.serviceDate), desc(trips.departureTime))
       .limit(50);
+    if (rows.length === 0) return [];
+    // Última paragem de cada rota (destino da viagem), para mostrar o percurso da reserva.
+    const ends = await db
+      .select({ routeId: routeStops.routeId, position: routeStops.position, name: stops.name, minutesFromStart: routeStops.minutesFromStart })
+      .from(routeStops)
+      .innerJoin(stops, eq(stops.id, routeStops.stopId))
+      .where(inArray(routeStops.routeId, [...new Set(rows.map((r) => r.routeId))]))
+      .orderBy(desc(routeStops.position));
+    return rows.map(({ routeId, ...b }) => {
+      const end = ends.find((e) => e.routeId === routeId);
+      return { ...b, endStop: end ? { name: end.name, minutesFromStart: end.minutesFromStart } : null };
+    });
   });
 
   app.post("/bookings", { preHandler: can("student.self") }, async (request, reply) => {
@@ -339,8 +406,21 @@ export async function studentRoutes(app: FastifyInstance) {
     const { id } = parse(uuidParam, request.params);
     const auth = request.auth!;
     const [trip] = await db
-      .select({ id: trips.id, status: trips.status, serviceDate: trips.serviceDate, departureTime: trips.departureTime, routeId: trips.routeId, startedAt: trips.startedAt })
+      .select({
+        id: trips.id,
+        status: trips.status,
+        serviceDate: trips.serviceDate,
+        departureTime: trips.departureTime,
+        routeId: trips.routeId,
+        startedAt: trips.startedAt,
+        routeCode: routes.code,
+        routeName: routes.name,
+        vehiclePlate: vehicles.plate,
+        vehicleModel: vehicles.model,
+      })
       .from(trips)
+      .innerJoin(routes, eq(routes.id, trips.routeId))
+      .leftJoin(vehicles, eq(vehicles.id, trips.vehicleId))
       .where(eq(trips.id, id));
     if (!trip) throw notFound("Viagem não encontrada.");
 
@@ -370,12 +450,21 @@ export async function studentRoutes(app: FastifyInstance) {
 
     // A localização só é partilhada durante a viagem autorizada.
     const location = trip.status === "in_progress" ? await latestLocation(db, id) : null;
+    const routeStopRows = await db
+      .select({ stopId: stops.id, name: stops.name, lat: stops.lat, lng: stops.lng, minutesFromStart: routeStops.minutesFromStart })
+      .from(routeStops)
+      .innerJoin(stops, eq(stops.id, routeStops.stopId))
+      .where(and(eq(routeStops.routeId, trip.routeId), eq(stops.active, true)))
+      .orderBy(asc(routeStops.position));
     return {
       tripId: trip.id,
       status: trip.status,
       serviceDate: trip.serviceDate,
       departureTime: trip.departureTime,
       startedAt: trip.startedAt,
+      route: { code: trip.routeCode, name: trip.routeName, stops: routeStopRows },
+      vehicle: trip.vehiclePlate ? { plate: trip.vehiclePlate, model: trip.vehicleModel } : null,
+      myStopId,
       location,
       myStop: myStop && {
         name: myStop.name,

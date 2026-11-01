@@ -14,10 +14,12 @@ export default function StudentLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="route/[id]" options={{ title: "Rota" }} />
-      <Stack.Screen name="live/[tripId]" options={{ title: "Acompanhar viagem" }} />
+      <Stack.Screen name="route/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="live/[tripId]" options={{ headerShown: false }} />
+      <Stack.Screen name="plans" options={{ headerShown: false }} />
+      <Stack.Screen name="intercity" options={{ headerShown: false }} />
+      <Stack.Screen name="bookings" options={{ title: "Histórico de viagens" }} />
       <Stack.Screen name="verification" options={{ title: "Inscrição universitária" }} />
-      <Stack.Screen name="plans" options={{ title: "Plano e pagamentos" }} />
       <Stack.Screen name="notifications" options={{ title: "Notificações" }} />
       <Stack.Screen name="incident" options={{ title: "Ocorrências" }} />
     </Stack>
