@@ -170,7 +170,7 @@ try {
 
   let routeUrl = "";
   await step(`Criar rota ${routeCode} com paragens ordenadas e horário, e activá-la`, async () => {
-    await page.getByRole("link", { name: "Rotas e horários" }).click();
+    await page.getByRole("link", { name: "Rotas", exact: true }).click();
     await page.getByRole("button", { name: "Nova rota" }).click();
     await field(modal, "Código").fill(routeCode);
     await field(modal, "Nome").fill(`Rota E2E ${suffix}`);
@@ -199,11 +199,11 @@ try {
 
     await page.getByRole("button", { name: "Activar" }).click();
     await modal.getByRole("button", { name: "Activar" }).click();
-    await page.locator(".page-header .badge", { hasText: "Activa" }).waitFor();
+    await page.locator(".route-editor .card-head .badge", { hasText: "Activa" }).waitFor();
   });
 
   await step(`Criar rota intercidades ${intercityCode} (sem sentido nem universidades)`, async () => {
-    await page.getByRole("link", { name: "Rotas e horários" }).click();
+    await page.getByRole("link", { name: "Rotas", exact: true }).click();
     await page.getByRole("button", { name: "Nova rota" }).click();
     await field(modal, "Código").fill(intercityCode);
     await field(modal, "Nome").fill(`Intercidades E2E ${suffix}`);
@@ -211,7 +211,7 @@ try {
     if (await field(modal, "Sentido").count()) throw new Error("O campo Sentido devia estar escondido.");
     await mustSubmit(modal, "Criar rascunho");
     await page.waitForURL(/\/rotas\/[0-9a-f-]{36}$/);
-    await page.locator(".page-header p", { hasText: "Intercidades" }).waitFor();
+    await page.locator(".route-editor p", { hasText: "Intercidades" }).waitFor();
   });
 
   await step(`Criar veículo ${plate} e recusar matrícula duplicada`, async () => {
@@ -265,16 +265,16 @@ try {
     for (const expected of ["07:15", plate, driverName, "0 / 20"]) {
       if (!text.includes(expected)) throw new Error(`A linha da viagem não contém "${expected}": ${text}`);
     }
-    await page.getByRole("link", { name: "Rotas e horários" }).click();
+    await page.getByRole("link", { name: "Rotas", exact: true }).click();
     const routeRow = page.locator("tr", { hasText: routeCode });
     await routeRow.waitFor();
     const cells = await routeRow.locator("td").allInnerTexts();
-    const [, , , universitiesCell, stopsCell, schedulesCell] = cells.map((c) => c.trim());
+    const [, universitiesCell, stopsCell, schedulesCell] = cells.map((c) => c.trim());
     if (universitiesCell !== uni.short || stopsCell !== "2" || schedulesCell !== "1") {
       throw new Error(`Lista de rotas com dados errados: ${cells.join(" | ")}`);
     }
     await page.goto(routeUrl);
-    await page.locator(".page-header .badge", { hasText: "Activa" }).waitFor();
+    await page.locator(".route-editor .card-head .badge", { hasText: "Activa" }).waitFor();
     await page.getByRole("cell", { name: "07:15" }).waitFor();
     const order = await page.locator(".stop-list li .grow").allInnerTexts();
     if (order.join("|") !== `${pickupStop}|${campusStop}`) throw new Error(`Ordem inesperada após recarregar: ${order.join(" → ")}`);

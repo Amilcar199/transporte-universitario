@@ -2,7 +2,8 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { BrowserRouter, Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { brand, ROLE_LABELS, type Permission } from "@uni/shared";
 import { AuthProvider, useAuth } from "./auth.tsx";
-import { RouteDetailPage, RoutesPage, StopsPage, UniversitiesPage } from "./pages/network.tsx";
+import { initials } from "./ui.tsx";
+import { RoutesPage, StopsPage, UniversitiesPage } from "./pages/network.tsx";
 import { FleetPage, IncidentsPage, TripsPage } from "./pages/operations.tsx";
 import { StaffPage, StudentsPage, VerificationsPage } from "./pages/people.tsx";
 import { PaymentsPage, PlansPage, RefundsPage, SubscriptionsPage } from "./pages/finance.tsx";
@@ -13,31 +14,31 @@ import { ReportsPage } from "./pages/reports.tsx";
 interface Section {
   path: string;
   label: string;
-  group: string;
   permission: Permission;
   element: ReactNode;
 }
 
 const SECTIONS: Section[] = [
-  { path: "/", label: "Visão geral", group: "Início", permission: "dashboard.view", element: <DashboardPage /> },
-  { path: "/universidades", label: "Universidades", group: "Rede", permission: "universities.read", element: <UniversitiesPage /> },
-  { path: "/paragens", label: "Paragens", group: "Rede", permission: "routes.read", element: <StopsPage /> },
-  { path: "/rotas", label: "Rotas e horários", group: "Rede", permission: "routes.read", element: <RoutesPage /> },
-  { path: "/viagens", label: "Viagens e atribuições", group: "Operação", permission: "trips.read", element: <TripsPage /> },
-  { path: "/frota", label: "Veículos e motoristas", group: "Operação", permission: "fleet.read", element: <FleetPage /> },
-  { path: "/ocorrencias", label: "Ocorrências", group: "Operação", permission: "incidents.read", element: <IncidentsPage /> },
-  { path: "/parceiros", label: "Transportadoras parceiras", group: "Operação", permission: "partners.read", element: <PartnersPage /> },
-  { path: "/relatorios", label: "Relatórios", group: "Operação", permission: "reports.view", element: <ReportsPage /> },
-  { path: "/estudantes", label: "Estudantes", group: "Estudantes", permission: "students.read", element: <StudentsPage /> },
-  { path: "/verificacoes", label: "Verificações", group: "Estudantes", permission: "students.read", element: <VerificationsPage /> },
-  { path: "/planos", label: "Planos", group: "Finanças", permission: "plans.read", element: <PlansPage /> },
-  { path: "/subscricoes", label: "Subscrições", group: "Finanças", permission: "subscriptions.read", element: <SubscriptionsPage /> },
-  { path: "/pagamentos", label: "Pagamentos", group: "Finanças", permission: "payments.read", element: <PaymentsPage /> },
-  { path: "/reembolsos", label: "Reembolsos", group: "Finanças", permission: "refunds.manage", element: <RefundsPage /> },
-  { path: "/equipa", label: "Equipa e perfis", group: "Administração", permission: "users.manage", element: <StaffPage /> },
-  { path: "/auditoria", label: "Auditoria", group: "Administração", permission: "audit.read", element: <AuditPage /> },
-  { path: "/definicoes", label: "Definições", group: "Administração", permission: "settings.manage", element: <SettingsPage /> },
+  { path: "/", label: "Visão geral", permission: "dashboard.view", element: <DashboardPage /> },
+  { path: "/estudantes", label: "Estudantes", permission: "students.read", element: <StudentsPage /> },
+  { path: "/verificacoes", label: "Verificações", permission: "students.read", element: <VerificationsPage /> },
+  { path: "/universidades", label: "Universidades", permission: "universities.read", element: <UniversitiesPage /> },
+  { path: "/rotas", label: "Rotas", permission: "routes.read", element: <RoutesPage /> },
+  { path: "/paragens", label: "Paragens", permission: "routes.read", element: <StopsPage /> },
+  { path: "/viagens", label: "Viagens e atribuições", permission: "trips.read", element: <TripsPage /> },
+  { path: "/frota", label: "Veículos e motoristas", permission: "fleet.read", element: <FleetPage /> },
+  { path: "/planos", label: "Planos", permission: "plans.read", element: <PlansPage /> },
+  { path: "/subscricoes", label: "Subscrições", permission: "subscriptions.read", element: <SubscriptionsPage /> },
+  { path: "/pagamentos", label: "Pagamentos", permission: "payments.read", element: <PaymentsPage /> },
+  { path: "/reembolsos", label: "Reembolsos", permission: "refunds.manage", element: <RefundsPage /> },
+  { path: "/parceiros", label: "Transportadoras parceiras", permission: "partners.read", element: <PartnersPage /> },
+  { path: "/ocorrencias", label: "Ocorrências", permission: "incidents.read", element: <IncidentsPage /> },
+  { path: "/relatorios", label: "Relatórios", permission: "reports.view", element: <ReportsPage /> },
+  { path: "/equipa", label: "Equipa e perfis", permission: "users.manage", element: <StaffPage /> },
+  { path: "/auditoria", label: "Auditoria", permission: "audit.read", element: <AuditPage /> },
+  { path: "/definicoes", label: "Definições", permission: "settings.manage", element: <SettingsPage /> },
 ];
+
 
 export function App() {
   return (
@@ -55,7 +56,6 @@ function Shell() {
   if (!me) return <LoginPage />;
 
   const allowed = SECTIONS.filter((s) => can(s.permission));
-  const groups = [...new Set(allowed.map((s) => s.group))];
   return (
     <div className="layout">
       <aside className="sidebar">
@@ -63,32 +63,32 @@ function Shell() {
           <div className="brand-mark">{brand.logo.monogram}</div>
           <div>
             <div className="brand-name">{brand.name}</div>
-            <div className="brand-sub">Painel administrativo</div>
+            <div className="brand-sub">Painel de operação</div>
           </div>
         </div>
-        {groups.map((g) => (
-          <div key={g} style={{ display: "contents" }}>
-            <div className="nav-group">{g}</div>
-            {allowed.filter((s) => s.group === g).map((s) => (
-              <NavLink key={s.path} to={s.path} end={s.path === "/"} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-                {s.label}
-              </NavLink>
-            ))}
-          </div>
+        {allowed.map((s) => (
+          <NavLink key={s.path} to={s.path} end={s.path === "/"} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
+            {s.label}
+          </NavLink>
         ))}
-        <div className="sidebar-foot">
-          <div><strong>{me.fullName}</strong></div>
-          <div style={{ opacity: 0.75 }}>{ROLE_LABELS[me.role]}</div>
-          <button className="btn btn-sm" onClick={logout}>Terminar sessão</button>
-        </div>
       </aside>
       <main className="main">
+        <div className="topbar">
+          <div className="user-chip">
+            <div className="avatar">{initials(me.fullName)}</div>
+            <div>
+              <strong>{me.fullName}</strong>
+              <span>{ROLE_LABELS[me.role]}</span>
+            </div>
+          </div>
+          <button className="btn btn-sm" onClick={logout}>Terminar sessão</button>
+        </div>
         {allowed.length === 0 ? (
           <div className="empty">O seu perfil não tem secções disponíveis no painel. A validação de passes faz-se na aplicação móvel.</div>
         ) : (
           <Routes>
             {allowed.map((s) => <Route key={s.path} path={s.path} element={s.element} />)}
-            {can("routes.read") && <Route path="/rotas/:id" element={<RouteDetailPage />} />}
+            {can("routes.read") && <Route path="/rotas/:id" element={<RoutesPage />} />}
             <Route path="*" element={<Navigate to={allowed[0]!.path} replace />} />
           </Routes>
         )}

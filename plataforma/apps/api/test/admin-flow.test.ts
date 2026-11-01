@@ -122,6 +122,35 @@ describe("aceitação do painel administrativo", () => {
     await t.close();
   });
 
+  it("a visão geral só mostra os indicadores que o perfil pode ver", async () => {
+    const { createNetwork } = await import("./helpers.ts");
+    const t = await createTestApp();
+    await t.createUser("super_admin", "admin.kpi@teste.ao");
+    const admin = await t.login("admin.kpi@teste.ao");
+    const net = await createNetwork(t, admin);
+    await t.createUser("student", "estudante.kpi@teste.ao", { verifiedUniversityId: net.uni.id });
+
+    const full = await t.call<any>("GET", "/admin/dashboard", admin);
+    expect(full.status).toBe(200);
+    expect(full.body).toMatchObject({
+      registeredStudents: 1,
+      pendingPaymentSubscriptions: 0,
+      confirmedPaymentsThisMonth: { count: 0, totalKz: 0 },
+      approvedRefunds: { count: 0, totalKz: 0 },
+      drivers: { onDuty: 0, active: 1 },
+      hasDemoData: false,
+    });
+
+    await t.createUser("finance", "financas.kpi@teste.ao");
+    const finance = await t.call<any>("GET", "/admin/dashboard", await t.login("financas.kpi@teste.ao"));
+    expect(finance.body).toMatchObject({ registeredStudents: null, drivers: null, confirmedPaymentsThisMonth: { count: 0, totalKz: 0 } });
+
+    await t.createUser("university_manager", "gestor.kpi@teste.ao");
+    const manager = await t.call<any>("GET", "/admin/dashboard", await t.login("gestor.kpi@teste.ao"));
+    expect(manager.body).toMatchObject({ registeredStudents: 0, pendingVerifications: 0, activeSubscriptions: 0, confirmedPaymentsThisMonth: null });
+    await t.close();
+  });
+
   it("cancelar uma viagem cancela as reservas e notifica sem duplicar", async () => {
     const { createNetwork } = await import("./helpers.ts");
     const t = await createTestApp();

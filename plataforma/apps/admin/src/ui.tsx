@@ -55,6 +55,11 @@ export function Badge({ tone = "neutral", children }: { tone?: "neutral" | "succ
   return <span className={`badge badge-${tone}`}>{children}</span>;
 }
 
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "")).toUpperCase() || "?";
+}
+
 export function DemoTag({ show }: { show?: boolean }) {
   return show ? <span className="badge badge-demo" title="Registo de demonstração">DEMO</span> : null;
 }
